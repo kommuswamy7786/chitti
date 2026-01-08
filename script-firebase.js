@@ -15,28 +15,36 @@ class ChittiApp {
     initFirebase() {
         try {
             // Wait for Firebase to be ready
-            if (typeof auth === 'undefined') {
-                console.log('Firebase not initialized, using localStorage only');
-                this.chittis = this.loadFromStorage('chittis') || [];
-                this.payments = this.loadFromStorage('payments') || [];
-                this.lotteries = this.loadFromStorage('lotteries') || [];
-                this.init();
-                return;
-            }
+            const waitForFirebase = setInterval(() => {
+                if (typeof auth !== 'undefined' && typeof db !== 'undefined') {
+                    clearInterval(waitForFirebase);
+                    
+                    auth.onAuthStateChanged((user) => {
+                        if (user) {
+                            this.currentUser = user;
+                            this.setupRealtimeListeners();
+                            this.init();
+                        } else {
+                            // No user, use local storage as fallback
+                            this.chittis = this.loadFromStorage('chittis') || [];
+                            this.payments = this.loadFromStorage('payments') || [];
+                            this.lotteries = this.loadFromStorage('lotteries') || [];
+                            this.init();
+                        }
+                    });
+                }
+            }, 100);
 
-            auth.onAuthStateChanged((user) => {
-                if (user) {
-                    this.currentUser = user;
-                    this.setupRealtimeListeners();
-                    this.init();
-                } else {
-                    // No user, use local storage as fallback
+            // Fallback if Firebase doesn't load
+            setTimeout(() => {
+                clearInterval(waitForFirebase);
+                if (!this.chittis || this.chittis.length === 0) {
                     this.chittis = this.loadFromStorage('chittis') || [];
                     this.payments = this.loadFromStorage('payments') || [];
                     this.lotteries = this.loadFromStorage('lotteries') || [];
                     this.init();
                 }
-            });
+            }, 3000);
         } catch (error) {
             console.error('Firebase initialization error:', error);
             // Fallback to localStorage
@@ -506,13 +514,24 @@ class ChittiApp {
             });
 
             // Save updated chitti
-            await db.collection('chittis').doc(chittiId).update({
-                members: chitti.members
-            });
+            if (typeof db !== 'undefined' && db) {
+                // Firebase enabled
+                await db.collection('chittis').doc(chittiId).update({
+                    members: chitti.members
+                });
+            } else {
+                // Fallback to localStorage
+                const index = this.chittis.findIndex(c => c.id == chittiId);
+                if (index >= 0) {
+                    this.chittis[index] = chitti;
+                    this.saveToStorage('chittis', this.chittis);
+                }
+            }
 
             this.showToast(`${count} members selected for lottery`, 'success');
         } catch (error) {
             this.showToast('Error saving participants: ' + error.message, 'error');
+            console.error('Save participants error:', error);
         }
     }
 
