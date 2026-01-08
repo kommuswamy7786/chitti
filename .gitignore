@@ -1,0 +1,29 @@
+# Firebase config with real credentials
+firebase-config.js
+
+# Node modules (if you add npm packages later)
+node_modules/
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Environment
+.env
+.env.local
