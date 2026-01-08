@@ -1,6 +1,3 @@
-# Firebase config with real credentials
-firebase-config.js
-
 # Node modules (if you add npm packages later)
 node_modules/
 package-lock.json
