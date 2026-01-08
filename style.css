@@ -343,6 +343,12 @@ body {
     color: #27ae60;
 }
 
+.status-completed {
+    background: #d5f4e6;
+    color: #27ae60;
+    font-weight: bold;
+}
+
 .status-pending {
     background: #ffe5cc;
     color: #e67e22;

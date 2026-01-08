@@ -11,8 +11,10 @@ class ChittiApp {
         this.unsubscribeLotteries = null;
         
         // Store Firebase references
-        this.db = typeof db !== 'undefined' ? db : null;
-        this.auth = typeof auth !== 'undefined' ? auth : null;
+        this.db = typeof window !== 'undefined' && window.db ? window.db : null;
+        this.auth = typeof window !== 'undefined' && window.auth ? window.auth : null;
+        
+        console.log('ChittiApp constructor - db:', !!this.db, 'auth:', !!this.auth);
         
         this.initFirebase();
     }
@@ -21,11 +23,13 @@ class ChittiApp {
         try {
             // Wait for Firebase to be ready
             const waitForFirebase = setInterval(() => {
-                if (typeof auth !== 'undefined' && typeof db !== 'undefined') {
+                if (typeof window !== 'undefined' && window.auth && window.db) {
                     clearInterval(waitForFirebase);
                     
-                    this.db = db;
-                    this.auth = auth;
+                    this.db = window.db;
+                    this.auth = window.auth;
+                    
+                    console.log('Firebase ready, setting up auth listener');
                     
                     this.auth.onAuthStateChanged((user) => {
                         if (user) {
@@ -47,6 +51,7 @@ class ChittiApp {
             setTimeout(() => {
                 clearInterval(waitForFirebase);
                 if (!this.chittis || this.chittis.length === 0) {
+                    console.log('Firebase not available, using localStorage only');
                     this.chittis = this.loadFromStorage('chittis') || [];
                     this.payments = this.loadFromStorage('payments') || [];
                     this.lotteries = this.loadFromStorage('lotteries') || [];
@@ -117,39 +122,61 @@ class ChittiApp {
             btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
         });
 
-        // Forms
-        document.getElementById('chittiForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.createChitti();
-        });
+        // Forms - use arrow functions to preserve 'this'
+        const chittiForm = document.getElementById('chittiForm');
+        if (chittiForm) {
+            chittiForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                console.log('Form submitted');
+                this.createChitti();
+            });
+        } else {
+            console.error('chittiForm not found');
+        }
 
-        document.getElementById('paymentForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.savePayments();
-        });
+        const paymentForm = document.getElementById('paymentForm');
+        if (paymentForm) {
+            paymentForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.savePayments();
+            });
+        }
 
-        document.getElementById('paymentChitti').addEventListener('change', (e) => {
-            this.populateMemberPayments(e.target.value);
-        });
+        const paymentChitti = document.getElementById('paymentChitti');
+        if (paymentChitti) {
+            paymentChitti.addEventListener('change', (e) => {
+                this.populateMemberPayments(e.target.value);
+            });
+        }
 
-        document.getElementById('lotteryParticipantsForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.saveLotteryParticipants();
-        });
+        const lotteryParticipantsForm = document.getElementById('lotteryParticipantsForm');
+        if (lotteryParticipantsForm) {
+            lotteryParticipantsForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveLotteryParticipants();
+            });
+        }
 
         // Payment History
         this.updatePaymentHistory();
 
         // Report
-        document.getElementById('reportChitti').addEventListener('change', (e) => {
-            this.loadReport(e.target.value);
-        });
+        const reportChitti = document.getElementById('reportChitti');
+        if (reportChitti) {
+            reportChitti.addEventListener('change', (e) => {
+                this.loadReport(e.target.value);
+            });
+        }
 
         // Lottery month default
         const today = new Date();
         const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-        document.getElementById('lotteryMonth').value = monthStr;
-        document.getElementById('paymentMonth').value = monthStr;
+        
+        const lotteryMonth = document.getElementById('lotteryMonth');
+        if (lotteryMonth) lotteryMonth.value = monthStr;
+        
+        const paymentMonth = document.getElementById('paymentMonth');
+        if (paymentMonth) paymentMonth.value = monthStr;
     }
 
     // Tab Switching
@@ -174,6 +201,8 @@ class ChittiApp {
 
     // Chitti Management
     async createChitti() {
+        console.log('createChitti called');
+        
         const name = document.getElementById('chittiName').value;
         const monthlyAmount = parseInt(document.getElementById('monthlyAmount').value);
         const commission = parseFloat(document.getElementById('commission').value) || 0;
@@ -182,6 +211,8 @@ class ChittiApp {
             .map(m => m.trim())
             .filter(m => m !== '');
         const editingChittiId = document.getElementById('editingChittiId').value;
+
+        console.log('Form data:', { name, monthlyAmount, commission, memberCount: memberNames.length });
 
         if (memberNames.length === 0) {
             this.showToast('Please enter at least one member name', 'error');
@@ -209,6 +240,8 @@ class ChittiApp {
         };
 
         try {
+            console.log('Saving chitti, db available:', !!this.db);
+            
             if (this.db) {
                 // Firebase enabled
                 if (editingChittiId) {
@@ -244,8 +277,8 @@ class ChittiApp {
             this.switchTab('dashboard');
             this.updateUI();
         } catch (error) {
-            this.showToast('Error saving chitti: ' + error.message, 'error');
             console.error('Create chitti error:', error);
+            this.showToast('Error saving chitti: ' + error.message, 'error');
         }
     }
 
@@ -379,6 +412,7 @@ class ChittiApp {
                         
                         const payment = {
                             chittiId: chittiId,
+                            chittiName: chitti.name,
                             memberId: memberId,
                             memberName: member.name,
                             amount: amount,
@@ -397,6 +431,12 @@ class ChittiApp {
                             this.payments.push(payment);
                         }
                         
+                        // Update member's payment info
+                        if (!member.paidMonths.includes(month)) {
+                            member.paidMonths.push(month);
+                        }
+                        member.totalPaid = (member.totalPaid || 0) + amount;
+                        
                         totalPaid += amount;
                         paymentsCount++;
                     }
@@ -408,8 +448,14 @@ class ChittiApp {
                 return;
             }
 
-            if (!this.db) {
+            // Save updated chitti with member payment info
+            if (this.db) {
+                await this.db.collection('chittis').doc(chittiId).update({
+                    members: chitti.members
+                });
+            } else {
                 this.saveToStorage('payments', this.payments);
+                this.saveToStorage('chittis', this.chittis);
             }
 
             this.showToast(`${paymentsCount} payments recorded! Total: ₹${totalPaid}`, 'success');
@@ -436,34 +482,71 @@ class ChittiApp {
             new Date(b.date) - new Date(a.date)
         );
 
-        sortedPayments.forEach(payment => {
-            const chitti = this.chittis.find(c => c.id === payment.chittiId);
+        sortedPayments.forEach((payment, index) => {
+            const chittiName = payment.chittiName || (this.chittis.find(c => c.id === payment.chittiId) ? this.chittis.find(c => c.id === payment.chittiId).name : 'Unknown');
             const row = document.createElement('tr');
+            
+            // Use index as a backup if id doesn't exist
+            const deleteId = payment.id !== undefined ? payment.id : index;
+            
             row.innerHTML = `
-                <td>${chitti ? chitti.name : 'Unknown'}</td>
+                <td>${chittiName}</td>
                 <td>${payment.memberName}</td>
                 <td>₹${payment.amount}</td>
                 <td>${payment.month}</td>
                 <td>${payment.date}</td>
-                <td><button class="btn btn-danger" onclick="app.deletePayment('${payment.id}')">Delete</button></td>
+                <td><button class="btn btn-danger" data-payment-id="${deleteId}" onclick="app.deletePaymentByButton(this)">Delete</button></td>
             `;
             tbody.appendChild(row);
         });
     }
 
+    deletePaymentByButton(button) {
+        const paymentId = button.getAttribute('data-payment-id');
+        this.deletePayment(paymentId);
+    }
+
     async deletePayment(paymentId) {
         if (confirm('Are you sure you want to delete this payment?')) {
             try {
+                console.log('Deleting payment ID:', paymentId, 'Type:', typeof paymentId);
+                
                 if (this.db) {
+                    // Firebase: paymentId is the document ID from Firestore
                     await this.db.collection('payments').doc(paymentId).delete();
+                    console.log('Deleted from Firebase');
                 } else {
-                    this.payments = this.payments.filter(p => p.id !== paymentId);
-                    this.saveToStorage('payments', this.payments);
+                    // localStorage: Need to handle both number and string IDs
+                    const paymentIdNum = parseFloat(paymentId);
+                    console.log('Looking for payment with ID:', paymentIdNum);
+                    console.log('Available payments:', this.payments.map(p => ({ id: p.id, type: typeof p.id })));
+                    
+                    // Find and remove payment
+                    const originalLength = this.payments.length;
+                    this.payments = this.payments.filter(p => {
+                        const match = p.id === paymentIdNum || p.id === paymentId;
+                        if (match) {
+                            console.log('Found payment to delete:', p);
+                        }
+                        return !match;
+                    });
+                    
+                    if (this.payments.length < originalLength) {
+                        console.log('Payment deleted successfully');
+                        this.saveToStorage('payments', this.payments);
+                    } else {
+                        console.warn('Payment not found in array');
+                        this.showToast('Payment not found', 'error');
+                        return;
+                    }
                 }
+                
                 this.showToast('Payment deleted', 'success');
                 this.updatePaymentHistory();
+                this.updateUI();
             } catch (error) {
                 this.showToast('Error deleting payment: ' + error.message, 'error');
+                console.error('Delete payment error:', error);
             }
         }
     }
@@ -586,6 +669,7 @@ class ChittiApp {
                 
                 const extraChargePayment = {
                     chittiId: chittiId,
+                    chittiName: chitti.name,
                     memberId: winner.id,
                     memberName: winner.name,
                     amount: 2000,
@@ -605,6 +689,7 @@ class ChittiApp {
                 const extraChargePayment = {
                     id: Date.now() + Math.random(),
                     chittiId: chittiId,
+                    chittiName: chitti.name,
                     memberId: winner.id,
                     memberName: winner.name,
                     amount: 2000,
@@ -706,22 +791,45 @@ class ChittiApp {
         }
 
         const chitti = this.chittis.find(c => c.id == chittiId);
+        if (!chitti) return;
+        
         const tbody = document.getElementById('reportTableBody');
         tbody.innerHTML = '';
 
-        const totalAmount = chitti.totalMembers * chitti.monthlyAmount;
+        // Each member's expected payment is just their monthly contribution
+        const monthlyContribution = chitti.monthlyAmount;
+        console.log('Report - Chitti:', chitti.name, 'Monthly Contribution:', monthlyContribution);
 
+        // Calculate payments for each member
         chitti.members.forEach(member => {
-            const paymentCount = member.paidMonths.length;
-            const status = member.totalPaid >= totalAmount ? 'Completed' : 'Pending';
+            // Get payments for this member
+            const memberPayments = this.payments.filter(p => p.memberId == member.id && p.chittiId == chittiId);
+            
+            // Calculate totals
+            let totalPaid = 0;
+            const paidMonths = [];
+            memberPayments.forEach(payment => {
+                totalPaid += payment.amount;
+                if (!paidMonths.includes(payment.month)) {
+                    paidMonths.push(payment.month);
+                }
+            });
+            
+            const paymentCount = memberPayments.length;
+            // Member is "Done" when they've paid at least their monthly contribution
+            const isCompleted = totalPaid >= monthlyContribution;
+            const status = isCompleted ? '✓ Done' : 'Pending';
+            const statusClass = isCompleted ? 'status-completed' : 'status-pending';
+            
+            console.log(`Member: ${member.name}, Paid: ₹${totalPaid}, Expected: ₹${monthlyContribution}, Completed: ${isCompleted}`);
             
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${member.name}</td>
                 <td>${paymentCount}</td>
-                <td>₹${member.totalPaid}</td>
+                <td>₹${totalPaid}</td>
                 <td>${member.wonLottery ? '✓ Yes' : 'No'}</td>
-                <td><span class="status-badge ${member.totalPaid > 0 ? 'status-paid' : 'status-pending'}">${status}</span></td>
+                <td><span class="status-badge ${statusClass}">${status}</span></td>
             `;
             tbody.appendChild(row);
         });
@@ -806,7 +914,7 @@ class ChittiApp {
 
 // Export Functions
 function exportToCSV() {
-    if (app.chittis.length === 0) {
+    if (!app || app.chittis.length === 0) {
         alert('No data to export');
         return;
     }
@@ -845,25 +953,34 @@ let app;
 
 function initializeApp() {
     try {
+        console.log('Initializing app...');
         app = new ChittiApp();
-        console.log('App initialized successfully');
+        console.log('✅ App initialized successfully');
+        console.log('App object:', app);
     } catch (error) {
-        console.error('App initialization error:', error);
+        console.error('❌ App initialization error:', error);
+        console.error('Stack:', error.stack);
         // Retry after delay
-        setTimeout(initializeApp, 1000);
+        setTimeout(initializeApp, 500);
     }
 }
 
-// Start initialization immediately, retry if needed
+// Wait for DOM to be ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeApp);
+    console.log('DOM still loading, waiting for DOMContentLoaded...');
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOMContentLoaded fired');
+        setTimeout(initializeApp, 100);
+    });
 } else {
-    initializeApp();
+    console.log('DOM already loaded, initializing now');
+    setTimeout(initializeApp, 100);
 }
 
-// Also try after a short delay as fallback
+// Fallback initialization
 setTimeout(() => {
     if (!app) {
+        console.log('App not initialized yet, trying again...');
         initializeApp();
     }
-}, 1500);
+}, 2000);
