@@ -9,6 +9,11 @@ class ChittiApp {
         this.unsubscribeChittis = null;
         this.unsubscribePayments = null;
         this.unsubscribeLotteries = null;
+        
+        // Store Firebase references
+        this.db = typeof db !== 'undefined' ? db : null;
+        this.auth = typeof auth !== 'undefined' ? auth : null;
+        
         this.initFirebase();
     }
 
@@ -19,7 +24,10 @@ class ChittiApp {
                 if (typeof auth !== 'undefined' && typeof db !== 'undefined') {
                     clearInterval(waitForFirebase);
                     
-                    auth.onAuthStateChanged((user) => {
+                    this.db = db;
+                    this.auth = auth;
+                    
+                    this.auth.onAuthStateChanged((user) => {
                         if (user) {
                             this.currentUser = user;
                             this.setupRealtimeListeners();
@@ -56,13 +64,13 @@ class ChittiApp {
     }
 
     setupRealtimeListeners() {
-        if (!this.currentUser) return;
+        if (!this.currentUser || !this.db) return;
 
         const userId = this.currentUser.uid;
 
         // Listen to chittis
         if (this.unsubscribeChittis) this.unsubscribeChittis();
-        this.unsubscribeChittis = db.collection('chittis')
+        this.unsubscribeChittis = this.db.collection('chittis')
             .where('userId', '==', userId)
             .onSnapshot((snapshot) => {
                 this.chittis = [];
@@ -74,7 +82,7 @@ class ChittiApp {
 
         // Listen to payments
         if (this.unsubscribePayments) this.unsubscribePayments();
-        this.unsubscribePayments = db.collection('payments')
+        this.unsubscribePayments = this.db.collection('payments')
             .where('userId', '==', userId)
             .onSnapshot((snapshot) => {
                 this.payments = [];
@@ -86,7 +94,7 @@ class ChittiApp {
 
         // Listen to lotteries
         if (this.unsubscribeLotteries) this.unsubscribeLotteries();
-        this.unsubscribeLotteries = db.collection('lotteries')
+        this.unsubscribeLotteries = this.db.collection('lotteries')
             .where('userId', '==', userId)
             .onSnapshot((snapshot) => {
                 this.lotteries = [];
@@ -201,13 +209,13 @@ class ChittiApp {
         };
 
         try {
-            if (typeof db !== 'undefined' && db) {
+            if (this.db) {
                 // Firebase enabled
                 if (editingChittiId) {
-                    await db.collection('chittis').doc(editingChittiId).update(chittiData);
+                    await this.db.collection('chittis').doc(editingChittiId).update(chittiData);
                     this.showToast(`Chitti "${name}" updated successfully!`, 'success');
                 } else {
-                    await db.collection('chittis').add(chittiData);
+                    await this.db.collection('chittis').add(chittiData);
                     this.showToast(`Chitti "${name}" created successfully!`, 'success');
                 }
             } else {
@@ -271,8 +279,8 @@ class ChittiApp {
     async deleteChitti(chittiId) {
         if (confirm('Are you sure you want to delete this chitti?')) {
             try {
-                if (typeof db !== 'undefined' && db) {
-                    await db.collection('chittis').doc(chittiId).delete();
+                if (this.db) {
+                    await this.db.collection('chittis').doc(chittiId).delete();
                 } else {
                     this.chittis = this.chittis.filter(c => c.id !== chittiId);
                     this.saveToStorage('chittis', this.chittis);
@@ -380,9 +388,9 @@ class ChittiApp {
                             timestamp: new Date()
                         };
 
-                        if (typeof db !== 'undefined' && db) {
+                        if (this.db) {
                             // Firebase enabled
-                            await db.collection('payments').add(payment);
+                            await this.db.collection('payments').add(payment);
                         } else {
                             // Fallback to localStorage
                             payment.id = Date.now() + Math.random();
@@ -400,7 +408,7 @@ class ChittiApp {
                 return;
             }
 
-            if (typeof db === 'undefined' || !db) {
+            if (!this.db) {
                 this.saveToStorage('payments', this.payments);
             }
 
@@ -446,8 +454,8 @@ class ChittiApp {
     async deletePayment(paymentId) {
         if (confirm('Are you sure you want to delete this payment?')) {
             try {
-                if (typeof db !== 'undefined' && db) {
-                    await db.collection('payments').doc(paymentId).delete();
+                if (this.db) {
+                    await this.db.collection('payments').doc(paymentId).delete();
                 } else {
                     this.payments = this.payments.filter(p => p.id !== paymentId);
                     this.saveToStorage('payments', this.payments);
@@ -514,9 +522,9 @@ class ChittiApp {
             });
 
             // Save updated chitti
-            if (typeof db !== 'undefined' && db) {
+            if (this.db) {
                 // Firebase enabled
-                await db.collection('chittis').doc(chittiId).update({
+                await this.db.collection('chittis').doc(chittiId).update({
                     members: chitti.members
                 });
             } else {
@@ -572,9 +580,9 @@ class ChittiApp {
                 drawnDate: new Date().toLocaleDateString()
             };
 
-            if (typeof db !== 'undefined' && db) {
+            if (this.db) {
                 // Firebase enabled
-                await db.collection('lotteries').add(lottery);
+                await this.db.collection('lotteries').add(lottery);
                 
                 const extraChargePayment = {
                     chittiId: chittiId,
@@ -588,7 +596,7 @@ class ChittiApp {
                     timestamp: new Date()
                 };
                 
-                await db.collection('payments').add(extraChargePayment);
+                await this.db.collection('payments').add(extraChargePayment);
             } else {
                 // Fallback to localStorage
                 lottery.id = Date.now();
@@ -664,8 +672,8 @@ class ChittiApp {
     async deleteLottery(lotteryId) {
         if (confirm('Are you sure you want to delete this lottery record?')) {
             try {
-                if (typeof db !== 'undefined' && db) {
-                    await db.collection('lotteries').doc(lotteryId).delete();
+                if (this.db) {
+                    await this.db.collection('lotteries').doc(lotteryId).delete();
                 } else {
                     this.lotteries = this.lotteries.filter(l => l.id !== lotteryId);
                     this.saveToStorage('lotteries', this.lotteries);
