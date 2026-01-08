@@ -1,265 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chitti Management System</title>
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chitti Management</title>
+  <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <h1>💰 Chitti Management System</h1>
-            <p>Track payments and manage lottery winners</p>
-        </header>
-
-        <!-- Navigation Tabs -->
-        <nav class="nav-tabs">
-            <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
-            <button class="nav-btn" data-tab="add-chitti">Create Chitti</button>
-            <button class="nav-btn" data-tab="payment">Record Payment</button>
-            <button class="nav-btn" data-tab="lottery">Draw Lottery</button>
-            <button class="nav-btn" data-tab="reports">Reports</button>
-        </nav>
-
-        <!-- Tab Contents -->
-        <main class="tab-content">
-
-            <!-- Dashboard Tab -->
-            <section id="dashboard" class="tab-pane active">
-                <h2>Dashboard</h2>
-                <div class="stats-container" id="statsContainer">
-                    <div class="stat-card">
-                        <h3>Total Chittis</h3>
-                        <p class="stat-number" id="totalChittis">0</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Total Members</h3>
-                        <p class="stat-number" id="totalMembers">0</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Total Collected</h3>
-                        <p class="stat-number" id="totalCollected">₹0</p>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Lotteries Drawn</h3>
-                        <p class="stat-number" id="totalLotteries">0</p>
-                    </div>
-                </div>
-
-                <div class="chitti-list-container">
-                    <h3>Your Chittis</h3>
-                    <div id="chittiList" class="chitti-list">
-                        <p class="empty-message">No chittis created yet. Create one to get started!</p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Create Chitti Tab -->
-            <section id="add-chitti" class="tab-pane">
-                <h2 id="formTitle">Create New Chitti</h2>
-                <form id="chittiForm" class="form">
-                    <div class="form-group">
-                        <label for="chittiName">Chitti Name *</label>
-                        <input type="text" id="chittiName" placeholder="e.g., Monthly Chitti 2026" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="monthlyAmount">Monthly Contribution (₹) *</label>
-                        <input type="number" id="monthlyAmount" placeholder="e.g., 10000" min="0" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="commission">Commission (%) *</label>
-                        <input type="number" id="commission" placeholder="e.g., 5" min="0" max="100" step="0.5" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="totalMembers">Total Members (optional - leave empty to auto-count)</label>
-                        <input type="number" id="totalMembers" placeholder="e.g., 10 (or leave empty)" min="1">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="members">Member Names (comma-separated) *</label>
-                        <textarea id="members" placeholder="John, Jane, Bob, Alice" required></textarea>
-                    </div>
-
-                    <input type="hidden" id="editingChittiId" value="">
-
-                    <div style="display: flex; gap: 10px;">
-                        <button type="submit" class="btn btn-primary" id="submitBtn">Create Chitti</button>
-                        <button type="button" class="btn btn-secondary" id="cancelEditBtn" onclick="app.cancelEdit()" style="display: none;">Cancel</button>
-                    </div>
-                </form>
-            </section>
-
-            <!-- Payment Tab -->
-            <section id="payment" class="tab-pane">
-                <h2>Record Payment</h2>
-                <form id="paymentForm" class="form">
-                    <div class="form-group">
-                        <label for="paymentChitti">Select Chitti *</label>
-                        <select id="paymentChitti" required>
-                            <option value="">-- Choose Chitti --</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="paymentMonth">Month/Year *</label>
-                        <input type="month" id="paymentMonth" required>
-                    </div>
-
-                    <div id="memberPaymentsContainer" class="form-group">
-                        <label>Member Payments</label>
-                        <!-- Members will be populated dynamically -->
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">Save Payments</button>
-                </form>
-
-                <div id="paymentHistory" class="section" style="margin-top: 30px;">
-                    <h3>Payment History</h3>
-                    <table id="paymentTable" class="table">
-                        <thead>
-                            <tr>
-                                <th>Chitti</th>
-                                <th>Member</th>
-                                <th>Amount</th>
-                                <th>Month</th>
-                                <th>Date</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="paymentTableBody">
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Lottery Tab -->
-            <section id="lottery" class="tab-pane">
-                <h2>Lottery System</h2>
-                
-                <div class="section" style="margin-bottom: 30px;">
-                    <h3>Select Lottery Participants</h3>
-                    <form id="lotteryParticipantsForm" class="form">
-                        <div class="form-group">
-                            <label for="participantChitti">Select Chitti *</label>
-                            <select id="participantChitti" required onchange="app.loadLotteryParticipants(this.value)">
-                                <option value="">-- Choose Chitti --</option>
-                            </select>
-                        </div>
-
-                        <div id="participantList" class="form-group">
-                            <label>Who wants to participate in lottery?</label>
-                            <!-- Members will be populated dynamically -->
-                        </div>
-
-                        <button type="submit" class="btn btn-primary">Save Participants</button>
-                    </form>
-                </div>
-
-                <hr style="border: 1px solid #e0e0e0; margin: 30px 0;">
-
-                <div class="section">
-                    <h3>Draw Winner</h3>
-                    <form id="lotteryForm" class="form">
-                        <div class="form-group">
-                            <label for="lotteryChitti">Select Chitti *</label>
-                            <select id="lotteryChitti" required>
-                                <option value="">-- Choose Chitti --</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="lotteryMonth">Month *</label>
-                            <input type="month" id="lotteryMonth" required>
-                        </div>
-
-                        <button type="button" class="btn btn-success" onclick="drawLottery()">🎲 Draw Winner</button>
-                    </form>
-
-                    <div id="lotteryResult" class="section" style="margin-top: 30px; display: none;">
-                        <div class="result-box">
-                            <h3>🎉 Winner Announced!</h3>
-                            <div class="winner-name" id="winnerName">-</div>
-                            <p>Month: <span id="resultMonth">-</span></p>
-                            <p>Chitti: <span id="resultChitti">-</span></p>
-                            <p style="color: #fff3cd; font-weight: bold; margin-top: 15px;">Extra Charge: ₹2,000</p>
-                            <button class="btn btn-secondary" onclick="hideLotteryResult()">Close</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="lotteryHistory" class="section" style="margin-top: 30px;">
-                    <h3>Lottery History</h3>
-                    <table id="lotteryTable" class="table">
-                        <thead>
-                            <tr>
-                                <th>Chitti</th>
-                                <th>Winner</th>
-                                <th>Month</th>
-                                <th>Extra Charge</th>
-                                <th>Date Drawn</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="lotteryTableBody">
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Reports Tab -->
-            <section id="reports" class="tab-pane">
-                <h2>Reports & Statistics</h2>
-                
-                <div class="form-group">
-                    <label for="reportChitti">Select Chitti to View Report</label>
-                    <select id="reportChitti">
-                        <option value="">-- Choose Chitti --</option>
-                    </select>
-                </div>
-
-                <div id="reportContainer" class="section" style="margin-top: 20px;">
-                    <h3>Member Payment Status</h3>
-                    <table id="reportTable" class="table">
-                        <thead>
-                            <tr>
-                                <th>Member Name</th>
-                                <th>Paid Months</th>
-                                <th>Total Amount Paid</th>
-                                <th>Won Lottery</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="reportTableBody">
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="section" style="margin-top: 30px;">
-                    <h3>Export Data</h3>
-                    <button class="btn btn-secondary" onclick="exportToCSV()">📥 Export as CSV</button>
-                    <button class="btn btn-secondary" onclick="printReport()">🖨️ Print Report</button>
-                </div>
-            </section>
-
-        </main>
+  <div id="app">
+    <div id="auth-section" class="container">
+      <div class="card">
+        <h1>🏦 Chitti Manager</h1>
+        <input type="tel" id="phone" placeholder="Mobile Number">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+      </div>
     </div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
+    <div id="admin-section" class="container hidden">
+      <div class="header">
+        <h2>Admin Dashboard</h2>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+      </div>
 
-    <!-- Firebase Config -->
-    <script src="firebase-config.js"></script>
-    <!-- App Scripts -->
-    <script src="script-firebase.js"></script>
+      <div class="card">
+        <h3>Create Chitti</h3>
+        <input type="number" id="chitti-amount" placeholder="Total Amount">
+        <input type="number" id="chitti-duration" placeholder="Duration (months)">
+        <input type="number" id="chitti-commission" placeholder="Commission %">
+        <button onclick="createChitti()">Create</button>
+      </div>
+
+      <div class="card">
+        <h3>Add Member</h3>
+        <input type="text" id="member-name" placeholder="Name">
+        <input type="tel" id="member-phone" placeholder="Mobile">
+        <input type="password" id="member-password" placeholder="Password">
+        <select id="member-chitti"></select>
+        <button onclick="addMember()">Add</button>
+      </div>
+
+      <div class="card">
+        <h3>Active Chittis</h3>
+        <div id="chitti-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>Members & Payments</h3>
+        <select id="view-chitti" onchange="loadMembers()"></select>
+        <div id="members-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>Lottery</h3>
+        <select id="lottery-chitti"></select>
+        <button onclick="runLottery()">Run Lottery</button>
+        <div id="lottery-result"></div>
+      </div>
+
+      <div class="card">
+        <h3>Reports</h3>
+        <div id="reports"></div>
+      </div>
+    </div>
+
+    <div id="member-section" class="container hidden">
+      <div class="header">
+        <h2>My Chitti</h2>
+        <button onclick="logout()" class="btn-secondary">Logout</button>
+      </div>
+      <div id="member-dashboard"></div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
